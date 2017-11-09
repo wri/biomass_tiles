@@ -12,8 +12,9 @@ END_Z=2
 END_YY=16
 Z_LEVELS=[156000,78000,39000,20000,10000,4900,2400,1200,611,305,152,76,38]
 THRESHOLDS=[10,15,20,25,30,50,75]
-
-
+EE_SPLIT_FOLDER='biomass_zsplit'
+GCS_TILES_ROOT='biomass/thresholds'
+GCS_BUCKET='wri-public'
 YEARS=ee.List.sequence(1,END_YY)
 BANDS=['year', 'total_biomass_loss', 'density']
 CARBON_ASSET_IDS=[
@@ -31,17 +32,18 @@ CARBON_ASSET_IDS=[
 """
 carbon=ee.ImageCollection(CARBON_ASSET_IDS).max().rename(['carbon'])
 lossyear=hansen.select(['lossyear'])
+threshold=None
 treecover_mask=None
 loss=None
 loss_mask=None
 
 
-def get_treecover_mask_for_threshold(threshold):
+def get_treecover_mask_for_threshold():
     return hansen.select(['treecover2000']).gte(threshold)
 
 
-def get_loss_for_threshold(threshold):
-    raw_loss=hansen_thresh_16.select(['loss_'+THRESHOLD]);
+def get_loss_for_threshold():
+    raw_loss=hansen_thresh_16.select(['loss_'+threshold]);
     return raw_loss.unmask()
                 .gt(0)
                 .multiply(255)
@@ -109,28 +111,27 @@ def get_density():
     return carbon.unitScale(0, 450).multiply(255).toInt()
 
 
-
-
-
+""" BIOMASS_IMAGE
+"""
+def biomass_image(threshold):
+    treecover_mask=get_treecover_mask_for_threshold()
+    loss=get_loss_for_threshold()
+    loss_mask=get_loss_mask()
+    loss_yy=get_loss_yy()
+    density=get_density()
+    biomass_loss=get_biomass_loss(density)
+    return ee.Image([loss_yy,biomass_loss,density]).rename(BANDS).toInt()
 
 
 """EXPORT HELPERS: biomass_loss 
 """
-def export_tiles(name,img,region,top=True):
-  if top:
-    max_z=START_Z
-    min_z=SPLIT_Z
-  else:
-    max_z=SPLIT_Z-1
-    min_z=END_Z
-
+def export_tiles(name,img,region,max_z,min_z):
   Export.map.toCloudStorage(
     image=img, 
     description=name, 
-    bucket='wri-public', 
+    bucket=GCS_BUCKET, 
     fileFormat='png', 
-    # path='biomass/tiles/'+name, 
-    path='biomass/tests/'+name, 
+    path='{}/{}'.format(GCS_TILES_ROOT,threshold), 
     writePublicTiles=True, 
     maxZoom=max_z, 
     minZoom=min_z, 
@@ -138,26 +139,45 @@ def export_tiles(name,img,region,top=True):
     skipEmptyTiles=True)
 
 
-          
 def export_split_asset(name,img,region):
-  scale=Z_LEVELS[SPLIT_Z-1]
-  img.reproject(scale=scale,
-                crs=CRS)
-  Export.image.toAsset(
-    image=img, 
-    description=name, 
-    assetId='projects/wri-datalab/biomass_zsplit/'+name, 
-    scale=scale, 
-    crs=CRS, 
-    region=region, 
-    maxPixels=1e13)
+    asset_name=None
+    scale=Z_LEVELS[SPLIT_Z-1]
+    img=img.reproject(scale=scale,crs=CRS)
+    Export.image.toAsset(
+        image=img, 
+        description=name, 
+        assetId='projects/wri-datalab/{}/{}'.format(EE_SPLIT_FOLDER,asset_name), 
+        scale=scale, 
+        crs=CRS, 
+        region=region, 
+        maxPixels=1e13)
 
 
 """ MAIN
 """
+def _inside(args):
+    max_z=SPLIT_Z-1
+    min_z=END_Z
+    # TODO LOAD IMAGE
+    bm_img=None
+    export_tiles(name,bm_img,region,max_z,min_z)
+    # TODO CONDITIONAL ASSET
 
-def run():
-    bm_img=ee.Image([loss_yy,biomass_loss,density]).rename(BANDS).toInt()
+
+def _outside(args):
+    max_z=START_Z
+    min_z=SPLIT_Z
+    # TODO CONSTRUCT BANDS
+    export_tiles(name,bm_img,region,max_z,min_z)
+
+
+
+def _zasset(args):
+    bm_img=None
+    export_split_asset()
+
+
+def run_tiles(loss_yy,biomass_loss,density):
 
 
 def main():
@@ -166,13 +186,8 @@ def main():
     parser.add_argument('threshold',help='treecover 2000:\none of {}'.format(THRESHOLDS))
     subparsers=parser.add_subparsers()
     parser_inside=subparsers.add_parser('inside', help='export the zoomed in z-levels')
-    parser_inside.add_argument('-max','--max',default=12,help='max level')
-    parser_inside.add_argument('-min','--min',default=7,help='min level')
-    parser_inside.add_argument('-a','--asset',default='True',help='export min level to asset')
     parser_inside.set_defaults(func=_inside)
     parser_outside=subparsers.add_parser('outside', help='export the zoomed out z-levels')
-    parser_outside.add_argument('-max','--max',default=6,help='max level')
-    parser_outside.add_argument('-min','--min',default=2,help='min level')
     parser_outside.set_defaults(func=_outside)
     parser_zasset=subparsers.add_parser('zasset', help='export z-level to asset')
     parser_zasset.add_argument('-z','--z_level',default=7,help='max level')
@@ -181,6 +196,7 @@ def main():
     if int(args.threshold) in THRESHOLDS: 
         geom_name=args.geom_name
         geom=get_geom(geom_name)
+        threshold=None
         args.func(args)
     else: 
         print 'INVALID THRESHOLD:',args.threshold,args
