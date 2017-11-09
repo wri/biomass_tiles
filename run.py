@@ -12,7 +12,8 @@ END_Z=2
 END_YY=16
 Z_LEVELS=[156000,78000,39000,20000,10000,4900,2400,1200,611,305,152,76,38]
 THRESHOLDS=[10,15,20,25,30,50,75]
-EE_SPLIT_FOLDER='biomass_zsplit'
+GEE_ROOT='projects/wri-datalab'
+GEE_SPLIT_FOLDER='biomass_zsplit'
 GCS_TILES_ROOT='biomass/thresholds'
 GCS_BUCKET='wri-public'
 YEARS=ee.List.sequence(1,END_YY)
@@ -113,7 +114,7 @@ def get_density():
 
 """ BIOMASS_IMAGE
 """
-def biomass_image(threshold):
+def get_biomass_image():
     treecover_mask=get_treecover_mask_for_threshold()
     loss=get_loss_for_threshold()
     loss_mask=get_loss_mask()
@@ -125,56 +126,75 @@ def biomass_image(threshold):
 
 """EXPORT HELPERS: biomass_loss 
 """
-def export_tiles(name,img,region,max_z,min_z):
-  Export.map.toCloudStorage(
-    image=img, 
-    description=name, 
-    bucket=GCS_BUCKET, 
-    fileFormat='png', 
-    path='{}/{}'.format(GCS_TILES_ROOT,threshold), 
-    writePublicTiles=True, 
-    maxZoom=max_z, 
-    minZoom=min_z, 
-    region=region, 
-    skipEmptyTiles=True)
+def split_asset_name():
+    asset_z=SPLIT_Z-1
+    if geom_name==DEFAULT_GEOM_NAME:
+        name='z{}'.format(asset_z)
+    else:
+        name='{}_z{}'.format(geom_name,asset_z)
+    return name
 
 
-def export_split_asset(name,img,region):
-    asset_name=None
-    scale=Z_LEVELS[SPLIT_Z-1]
-    img=img.reproject(scale=scale,crs=CRS)
+def split_asset_id():
+    return '{}/{}/{}'.format(GEE_ROOT,GEE_SPLIT_FOLDER,split_asset_name())
+
+
+def tiles_path():
+    if geom_name==DEFAULT_GEOM_NAME:
+        path='{}/{}'.format(GCS_TILES_ROOT,threshold)
+    else:
+        path='{}/{}/{}'.format(GCS_TILES_ROOT,geom_name,threshold)
+    return path
+
+
+def tiles_description(path,max_z,min_z):
+    return '{}__{}_{}'.format(path.replace('/','__'),max_z,min_z)
+
+
+def export_tiles(img,max_z,min_z):
+    path=tiles_path()
+    Export.map.toCloudStorage(
+        image=img, 
+        description=tiles_description(path,max_z,min_z), 
+        bucket=GCS_BUCKET, 
+        fileFormat='png', 
+        path=path, 
+        writePublicTiles=True, 
+        maxZoom=max_z, 
+        minZoom=min_z, 
+        region=geom, 
+        skipEmptyTiles=True)
+
+
+def export_split_asset(img):
+    img=img.reproject(scale=Z_LEVELS[SPLIT_Z-1],crs=CRS)
     Export.image.toAsset(
         image=img, 
-        description=name, 
-        assetId='projects/wri-datalab/{}/{}'.format(EE_SPLIT_FOLDER,asset_name), 
+        description=split_asset_name(), 
+        assetId=split_asset_id(), 
         scale=scale, 
         crs=CRS, 
-        region=region, 
+        region=geom, 
         maxPixels=1e13)
 
 
 """ MAIN
 """
 def _inside(args):
-    max_z=SPLIT_Z-1
-    min_z=END_Z
-    # TODO LOAD IMAGE
-    bm_img=None
-    export_tiles(name,bm_img,region,max_z,min_z)
-    # TODO CONDITIONAL ASSET
+    bm_img=ee.Image(split_asset_id())
+    export_tiles(name,bm_img,SPLIT_Z-1,END_Z)
 
 
 def _outside(args):
-    max_z=START_Z
-    min_z=SPLIT_Z
-    # TODO CONSTRUCT BANDS
-    export_tiles(name,bm_img,region,max_z,min_z)
+    bm_img=get_biomass_image()
+    export_tiles(name,bm_img,START_Z,SPLIT_Z)
+    if (args.split_asset is True) or (args.split_asset.lower()=='true'):
+        export_split_asset(bm_img)
 
 
-
-def _zasset(args):
-    bm_img=None
-    export_split_asset()
+def _split_asset(args):
+    bm_img=get_biomass_image()
+    export_split_asset(bm_img)
 
 
 def run_tiles(loss_yy,biomass_loss,density):
@@ -186,6 +206,7 @@ def main():
     parser.add_argument('threshold',help='treecover 2000:\none of {}'.format(THRESHOLDS))
     subparsers=parser.add_subparsers()
     parser_inside=subparsers.add_parser('inside', help='export the zoomed in z-levels')
+    parser_zasset.add_argument('-a','--split_asset',default=True,help='export spit asset')
     parser_inside.set_defaults(func=_inside)
     parser_outside=subparsers.add_parser('outside', help='export the zoomed out z-levels')
     parser_outside.set_defaults(func=_outside)
