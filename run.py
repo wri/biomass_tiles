@@ -2,7 +2,9 @@ import ee, gee
 import argparse
 gee.init()
 
-""" CONFIG """
+
+""" CONFIG
+"""
 MAX_PIXS=65500
 CRS="EPSG:4326"
 SCALE=27.829872698318393
@@ -31,34 +33,10 @@ CARBON_ASSET_IDS=[
 
 """"ASSETS
 """
+hansen_thresh_16=ee.Image('projects/wri-datalab/HansenComposite_16')
+hansen=ee.Image('UMD/hansen/global_forest_change_2016_v1_4')
 carbon=ee.ImageCollection(CARBON_ASSET_IDS).max().rename(['carbon'])
 lossyear=hansen.select(['lossyear'])
-threshold=None
-treecover_mask=None
-loss=None
-loss_mask=None
-
-
-def get_treecover_mask_for_threshold():
-    return hansen.select(['treecover2000']).gte(threshold)
-
-
-def get_loss_for_threshold():
-    raw_loss=hansen_thresh_16.select(['loss_'+threshold]);
-    return raw_loss.unmask()
-                .gt(0)
-                .multiply(255)
-                .reproject(
-                    scale=SCALE,
-                    crs=CRS
-                ).reduceResolution(
-                    reducer=ee.Reducer.mean(),
-                    maxPixels=MAX_PIXS
-                )
-
-
-def get_loss_mask():
-    return loss.neq(0);
 
 
 
@@ -72,56 +50,77 @@ def get_geom(name):
 
 
 
-"""BAND 1 (loss_yy): two-digit loss year (corresponding to the most carbon lossed)
+"""BIOMASS CLASS
 """
-def loss_by_year(yy):
-  return lossyear.eq(yy).updateMask(treecover_mask).multiply(255).toInt().rename(['loss'])
-
-
-def yy_image(yy):
-  yy=ee.Number(yy).toInt()
-  return ee.Image(yy).set({'year': yy}).rename(['year'])
-
-
-def yy_loss_image(yy_img):
-      yy_img=ee.Image(yy_img)
-      yy=ee.Number(yy_img.get('year')).toInt()
-      lby=loss_by_year(yy)
-      loss_image = lby.updateMask(lby).multiply(carbon);
-      return yy_img.addBands(loss_image).toFloat();
-
-
-def get_loss_yy():
-    year_images=YEARS.map(yy_image)
-    year_and_loss_images=ee.ImageCollection.fromImages(year_images.map(yy_loss_image))
-    return year_and_loss_images.qualityMosaic('loss')
-                            .select('year')
-                            .updateMask(loss_mask)
-                            .unmask()
-
-
-"""BAND 2: biomass_loss 
-"""
-def get_biomass_loss(density):
-    return loss.divide(255).multiply(density).updateMask(loss_mask)
+class BIOMASS(object):
     
+    def __init__(self,threshold):
+        self._image=None
+        self._init_assets(threshold)
+        
 
-""" BAND 3: density
-"""
-def get_density():
-    return carbon.unitScale(0, 450).multiply(255).toInt()
+    def image(self):
+        if not self._image:
+            loss_yy=self._get_loss_yy()
+            density=self._get_density()
+            biomass_loss=self._get_biomass_loss(density)
+            self._image=ee.Image([loss_yy,biomass_loss,density]).rename(BANDS).toInt()
+        return self._image
+    
+    
+    def _init_assets(self,threshold):
+        self.treecover_mask=self._treecover_mask_for_threshold(threshold)
+        self.loss=self._loss_for_threshold(threshold)
+        self.loss_mask=self.loss.neq(0)
+
+        
+    def _treecover_mask_for_threshold(self,threshold):
+        return hansen.select(['treecover2000']).gte(threshold)
+
+    
+    def _loss_for_threshold(self,threshold):
+        raw_loss=hansen_thresh_16.select(['loss_{}'.format(threshold)]);
+        return raw_loss.unmask().gt(0).multiply(255).reproject(
+                    scale=SCALE,
+                    crs=CRS
+                ).reduceResolution(
+                    reducer=ee.Reducer.mean(),
+                    maxPixels=MAX_PIXS
+                )
+
+    """BAND 1 (loss_yy): two-digit loss year (corresponding to the most carbon lossed)
+    """
+    def _get_loss_yy(self):
+
+        def _yy_image(yy):
+            yy=ee.Number(yy).toInt()
+            return ee.Image(yy).set({'year': yy}).rename(['year'])
+
+        def _yy_loss_image(yy_img):
+            yy_img=ee.Image(yy_img)
+            yy=ee.Number(yy_img.get('year')).toInt()
+            lby=lossyear.eq(yy).updateMask(
+                self.treecover_mask).multiply(255).toInt().rename(['loss'])
+            loss_image = lby.updateMask(lby).multiply(carbon);
+            return yy_img.addBands(
+                loss_image).toFloat()
+
+        year_images=YEARS.map(_yy_image)
+        year_and_loss_images=ee.ImageCollection.fromImages(year_images.map(_yy_loss_image))
+        return year_and_loss_images.qualityMosaic(
+            'loss').select('year').updateMask(self.loss_mask).unmask()
 
 
-""" BIOMASS_IMAGE
-"""
-def get_biomass_image():
-    treecover_mask=get_treecover_mask_for_threshold()
-    loss=get_loss_for_threshold()
-    loss_mask=get_loss_mask()
-    loss_yy=get_loss_yy()
-    density=get_density()
-    biomass_loss=get_biomass_loss(density)
-    return ee.Image([loss_yy,biomass_loss,density]).rename(BANDS).toInt()
+    """BAND 2: biomass_loss 
+    """
+    def _get_biomass_loss(self,density):
+        return self.loss.divide(255).multiply(density).updateMask(self.loss_mask)
+        
+
+    """ BAND 3: density
+    """
+    def _get_density(self):
+        return carbon.unitScale(0, 450).multiply(255).toInt()
 
 
 """EXPORT HELPERS: biomass_loss 
@@ -186,23 +185,24 @@ def _inside(args):
 
 
 def _outside(args):
-    bm_img=get_biomass_image()
-    export_tiles(name,bm_img,START_Z,SPLIT_Z)
+    bm=BIOMASS(args.threshold)
+    export_tiles(name,bm.image(),START_Z,SPLIT_Z)
     if (args.split_asset is True) or (args.split_asset.lower()=='true'):
-        export_split_asset(bm_img)
+        export_split_asset(bm.image())
 
 
 def _split_asset(args):
-    bm_img=get_biomass_image()
-    export_split_asset(bm_img)
+    bm=BIOMASS(args.threshold)
+    export_split_asset(bm.image())
 
-
-def run_tiles(loss_yy,biomass_loss,density):
 
 
 def main():
     parser=argparse.ArgumentParser(description='HANSEN COMPOSITE')
-    parser.add_argument('-g','--geom_name',default=DEFAULT_GEOM_NAME,help='geometry name (https://fusiontables.google.com/DataSource?docid=13BvM9v1Rzr90Ykf1bzPgbYvbb8kGSvwyqyDwO8NI)')
+    parser.add_argument(
+        '-g','--geom_name',
+        default=DEFAULT_GEOM_NAME,
+        help='geometry name (https://fusiontables.google.com/DataSource?docid=13BvM9v1Rzr90Ykf1bzPgbYvbb8kGSvwyqyDwO8NI)')
     parser.add_argument('threshold',help='treecover 2000:\none of {}'.format(THRESHOLDS))
     subparsers=parser.add_subparsers()
     parser_inside=subparsers.add_parser('inside', help='export the zoomed in z-levels')
