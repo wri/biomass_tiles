@@ -31,6 +31,13 @@ CARBON_ASSET_IDS=[
     ]
 
 
+"""PARAMS
+"""
+threshold=None
+name_prefix=None
+geom=None
+geom_name=None
+
 
 """"ASSETS
 """
@@ -43,8 +50,6 @@ lossyear=hansen.select(['lossyear'])
 
 """GEOMETRY
 """
-geom=None
-geom_name=None
 geoms_ft=ee.FeatureCollection('ft:13BvM9v1Rzr90Ykf1bzPgbYvbb8kGSvwyqyDwO8NI')
 def get_geom(name):
     f=geoms_ft.filter(ee.Filter.eq('name',name)).first()
@@ -101,9 +106,9 @@ class BIOMASS(object):
         def _yy_loss_image(yy_img):
             yy_img=ee.Image(yy_img)
             yy=ee.Number(yy_img.get('year')).toInt()
-            lby=lossyear.eq(yy).updateMask(
-                self.treecover_mask).multiply(255).toInt().rename(['loss'])
-            loss_image = lby.updateMask(lby).multiply(carbon);
+            ly=lossyear.eq(yy).updateMask(
+                self.treecover_mask).multiply(255).toInt()
+            loss_image = carbon.updateMask(lossyear.eq(yy)).updateMask(ly)..rename(['loss'])
             return yy_img.addBands(
                 loss_image).toFloat()
 
@@ -133,7 +138,7 @@ def split_asset_name():
         name='t{}_z{}'.format(threshold,asset_z)
     else:
         name='{}_t{}_z{}'.format(geom_name,threshold,asset_z)
-    return name
+    return '{}{}'.format(name_prefix,name)
 
 
 def split_asset_id():
@@ -145,7 +150,7 @@ def tiles_path():
         path='{}/{}'.format(GCS_TILES_ROOT,threshold)
     else:
         path='{}/{}/{}'.format(GCS_TILES_ROOT,geom_name,threshold)
-    return path
+    return '{}{}'.format(name_prefix,path)
 
 
 def tiles_description(path,max_z,min_z):
@@ -208,8 +213,12 @@ def _split_asset(args):
 
 
 def main():
-    global threshold, geom_name, geom
+    global threshold, geom_name, geom, name_prefix
     parser=argparse.ArgumentParser(description='HANSEN COMPOSITE')
+    parser.add_argument(
+        '-p','--name_prefix',
+        default='',
+        help='prefix for asset name and tiles path'
     parser.add_argument(
         '-g','--geom_name',
         default=DEFAULT_GEOM_NAME,
@@ -225,6 +234,7 @@ def main():
     parser_split_asset.set_defaults(func=_split_asset)
     args=parser.parse_args()
     if int(args.threshold) in THRESHOLDS: 
+        name_prefix=args.name_prefix
         threshold=args.threshold
         geom_name=args.geom_name
         geom=get_geom(geom_name)
@@ -239,7 +249,6 @@ def main():
 
 
 if __name__ == "__main__":
-    threshold=None
     main()
 
 
