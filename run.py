@@ -14,6 +14,7 @@ END_Z=2
 END_YY=16
 Z_LEVELS=[156000,78000,39000,20000,10000,4900,2400,1200,611,305,152,76,38]
 THRESHOLDS=[10,15,20,25,30,50,75]
+DEFAULT_GEOM_NAME='hansen_world'
 GEE_ROOT='projects/wri-datalab'
 GEE_SPLIT_FOLDER='biomass_zsplit'
 GCS_TILES_ROOT='biomass/thresholds'
@@ -46,8 +47,9 @@ geom=None
 geom_name=None
 geoms_ft=ee.FeatureCollection('ft:13BvM9v1Rzr90Ykf1bzPgbYvbb8kGSvwyqyDwO8NI')
 def get_geom(name):
-    return ee.Feature(geoms_ft.filter(ee.Filter.eq('name',name)).first()).geometry()
-
+    f=geoms_ft.filter(ee.Filter.eq('name',name)).first()
+    if f.getInfo():
+        return ee.Feature(f).geometry()
 
 
 """BIOMASS CLASS
@@ -152,52 +154,61 @@ def tiles_description(path,max_z,min_z):
 
 def export_tiles(img,max_z,min_z):
     path=tiles_path()
-    Export.map.toCloudStorage(
+    task=ee.batch.Export.map.toCloudStorage(
         image=img, 
         description=tiles_description(path,max_z,min_z), 
         bucket=GCS_BUCKET, 
         fileFormat='png', 
         path=path, 
-        writePublicTiles=True, 
+        writePublicTiles=False, 
         maxZoom=max_z, 
         minZoom=min_z, 
-        region=geom, 
+        region=geom.coordinates().getInfo(), 
         skipEmptyTiles=True)
+    run_task(task)
 
 
 def export_split_asset(img):
-    img=img.reproject(scale=Z_LEVELS[SPLIT_Z-1],crs=CRS)
-    Export.image.toAsset(
+    scale=Z_LEVELS[SPLIT_Z-1]
+    task=ee.batch.Export.image.toAsset(
         image=img, 
         description=split_asset_name(), 
         assetId=split_asset_id(), 
         scale=scale, 
         crs=CRS, 
-        region=geom, 
+        region=geom.coordinates().getInfo(), 
         maxPixels=1e13)
+    run_task(task)
+
+
+def run_task(task):
+    task.start()
+    print task.status()
+
 
 
 """ MAIN
 """
 def _inside(args):
     bm_img=ee.Image(split_asset_id())
-    export_tiles(name,bm_img,SPLIT_Z-1,END_Z)
+    export_tiles(bm_img,SPLIT_Z-1,END_Z)
 
 
 def _outside(args):
-    bm=BIOMASS(args.threshold)
-    export_tiles(name,bm.image(),START_Z,SPLIT_Z)
+    bm=BIOMASS(int(args.threshold))
+    export_tiles(bm.image(),START_Z,SPLIT_Z)
     if (args.split_asset is True) or (args.split_asset.lower()=='true'):
         export_split_asset(bm.image())
 
 
 def _split_asset(args):
-    bm=BIOMASS(args.threshold)
+    bm=BIOMASS(int(args.threshold))
     export_split_asset(bm.image())
 
 
 
 def main():
+    global threshold, geom_name, geom
     parser=argparse.ArgumentParser(description='HANSEN COMPOSITE')
     parser.add_argument(
         '-g','--geom_name',
@@ -206,24 +217,29 @@ def main():
     parser.add_argument('threshold',help='treecover 2000:\none of {}'.format(THRESHOLDS))
     subparsers=parser.add_subparsers()
     parser_inside=subparsers.add_parser('inside', help='export the zoomed in z-levels')
-    parser_zasset.add_argument('-a','--split_asset',default=True,help='export spit asset')
     parser_inside.set_defaults(func=_inside)
     parser_outside=subparsers.add_parser('outside', help='export the zoomed out z-levels')
+    parser_outside.add_argument('-a','--split_asset',default=True,help='export spit asset')
     parser_outside.set_defaults(func=_outside)
-    parser_zasset=subparsers.add_parser('zasset', help='export z-level to asset')
-    parser_zasset.add_argument('-z','--z_level',default=7,help='max level')
-    parser_zasset.set_defaults(func=_zasset)
+    parser_split_asset=subparsers.add_parser('split_asset', help='export z-level split asset')
+    parser_split_asset.set_defaults(func=_split_asset)
     args=parser.parse_args()
     if int(args.threshold) in THRESHOLDS: 
+        threshold=args.threshold
         geom_name=args.geom_name
         geom=get_geom(geom_name)
-        threshold=None
-        args.func(args)
+        if not geom:
+            print 'ERROR: {} is not a valid geometry'.format(geom_name)
+        else:
+            print "THRESHOLD: {}".format(threshold)
+            print "GEOMETRY: {}".format(geom_name)
+            args.func(args)
     else: 
-        print 'INVALID THRESHOLD:',args.threshold,args
+        print 'INVALID THRESHOLD {}: choose from {}'.format(args.threshold,THRESHOLDS)
 
 
 if __name__ == "__main__":
+    threshold=None
     main()
 
 
