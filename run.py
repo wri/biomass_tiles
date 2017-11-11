@@ -87,7 +87,7 @@ class BIOMASS(object):
     
     def _loss_for_threshold(self,threshold):
         raw_loss=hansen_thresh_16.select(['loss_{}'.format(threshold)]);
-        return raw_loss.unmask().gt(0).multiply(255).reproject(
+        return raw_loss.gt(0).multiply(255).reproject(
                     scale=SCALE,
                     crs=CRS
                 ).reduceResolution(
