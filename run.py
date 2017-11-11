@@ -77,17 +77,17 @@ class BIOMASS(object):
     
     def _init_assets(self,threshold):
         self.treecover_mask=self._treecover_mask_for_threshold(threshold)
-        self.loss=self._loss_for_threshold(threshold)
-        self.loss_mask=self.loss.neq(0)
+        raw_loss=hansen_thresh_16.select(['loss_{}'.format(threshold)]);
+        self.loss=self._mean_loss(raw_loss)
+        self.loss_mask=raw_loss.neq(0)
 
         
     def _treecover_mask_for_threshold(self,threshold):
         return hansen.select(['treecover2000']).gte(threshold)
 
     
-    def _loss_for_threshold(self,threshold):
-        raw_loss=hansen_thresh_16.select(['loss_{}'.format(threshold)]);
-        return raw_loss.gt(0).multiply(255).reproject(
+    def _mean_loss(self,raw_loss):
+        return raw_loss.gt(0).reproject(
                     scale=SCALE,
                     crs=CRS
                 ).reduceResolution(
@@ -104,7 +104,7 @@ class BIOMASS(object):
     """BAND 2: biomass_loss 
     """
     def _get_biomass_loss(self,density):
-        return self.loss.divide(255).multiply(density).updateMask(self.loss_mask)
+        return self.loss.multiply(density).updateMask(self.loss_mask)
         
 
     """ BAND 3: density
