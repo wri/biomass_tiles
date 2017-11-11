@@ -95,27 +95,10 @@ class BIOMASS(object):
                     maxPixels=MAX_PIXS
                 )
 
-    """BAND 1 (loss_yy): two-digit loss year (corresponding to the most carbon lossed)
+    """BAND 1 (loss_yy): two-digit loss year (corresponding to the most carbon loss)
     """
     def _get_loss_yy(self):
-
-        def _yy_image(yy):
-            yy=ee.Number(yy).toInt()
-            return ee.Image(yy).set({'year': yy}).rename(['year'])
-
-        def _yy_loss_image(yy_img):
-            yy_img=ee.Image(yy_img)
-            yy=ee.Number(yy_img.get('year')).toInt()
-            ly=lossyear.eq(yy).updateMask(
-                self.treecover_mask).multiply(255).toInt()
-            loss_image = carbon.updateMask(lossyear.eq(yy)).updateMask(ly)..rename(['loss'])
-            return yy_img.addBands(
-                loss_image).toFloat()
-
-        year_images=YEARS.map(_yy_image)
-        year_and_loss_images=ee.ImageCollection.fromImages(year_images.map(_yy_loss_image))
-        return year_and_loss_images.qualityMosaic(
-            'loss').select('year').updateMask(self.loss_mask).unmask()
+        return lossyear
 
 
     """BAND 2: biomass_loss 
@@ -218,7 +201,7 @@ def main():
     parser.add_argument(
         '-p','--name_prefix',
         default='',
-        help='prefix for asset name and tiles path'
+        help='prefix for asset name and tiles path')
     parser.add_argument(
         '-g','--geom_name',
         default=DEFAULT_GEOM_NAME,
