@@ -84,11 +84,31 @@ class BIOMASS(object):
 
     """BAND 1 (loss_yy): two-digit loss year (corresponding to the most carbon loss)
     """
+    # def _get_loss_yy(self):
+    #     return lossyear.mask(lossyear.gt(0)).reduceResolution(
+    #                 reducer=ee.Reducer.mode(),
+    #                 maxPixels=MAX_PIXS
+    #             ).unmask()
+
     def _get_loss_yy(self):
-        return lossyear.mask(lossyear.gt(0)).reduceResolution(
-                    reducer=ee.Reducer.mode(),
-                    maxPixels=MAX_PIXS
-                ).unmask()
+
+        def _yy_image(yy):
+            yy=ee.Number(yy).toInt()
+            return ee.Image(yy).set({'year': yy}).rename(['year'])
+
+        def _yy_loss_image(yy_img):
+            yy_img=ee.Image(yy_img)
+            yy=ee.Number(yy_img.get('year')).toInt()
+            lby=lossyear.eq(yy).multiply(255).toInt().rename(['loss'])
+            loss_image = lby.multiply(carbon);
+            return yy_img.addBands(
+                loss_image).toFloat()
+
+        year_images=YEARS.map(_yy_image)
+        year_and_loss_images=ee.ImageCollection.fromImages(year_images.map(_yy_loss_image))
+        return year_and_loss_images.qualityMosaic(
+            'loss').select('year').unmask()
+
 
     """BAND 2: biomass_loss 
     """
