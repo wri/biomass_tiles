@@ -107,7 +107,7 @@ class BIOMASS(object):
         year_images=YEARS.map(_yy_image)
         year_and_loss_images=ee.ImageCollection.fromImages(year_images.map(_yy_loss_image))
         return year_and_loss_images.qualityMosaic(
-            'loss').select('year').unmask()
+            'loss').select('year').mask(self.loss.gt(0)).unmask()
 
 
     """BAND 2: biomass_loss 
