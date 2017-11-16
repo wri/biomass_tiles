@@ -17,7 +17,7 @@ THRESHOLDS=[10,15,20,25,30,50,75]
 DEFAULT_GEOM_NAME='hansen_world'
 GEE_ROOT='projects/wri-datalab'
 GEE_SPLIT_FOLDER='biomass_zsplit'
-GCS_TILES_ROOT='biomass/thresholds'
+GCS_TILES_ROOT='biomass/treecover'
 GCS_BUCKET='wri-public'
 YEARS=ee.List.sequence(1,END_YY)
 BANDS=['year', 'total_biomass_loss', 'density']
@@ -42,8 +42,11 @@ geom_name=None
 """"ASSETS
 """
 hansen_thresh_16=ee.Image('projects/wri-datalab/HansenComposite_16')
+hansen_binary_loss_16=ee.Image('projects/wri-datalab/HANSEN_BINARY_LOSS_16')
 hansen=ee.Image('UMD/hansen/global_forest_change_2016_v1_4')
 carbon=ee.ImageCollection(CARBON_ASSET_IDS).max().rename(['carbon'])
+# carbon = ee.Image('users/davethau/whrc_carbon_test/carbon').rename(['carbon'])
+
 lossyear=hansen.select(['lossyear'])
 
 
@@ -76,35 +79,21 @@ class BIOMASS(object):
     
     
     def _init_assets(self,threshold):
-        self.treecover_mask=self._treecover_mask_for_threshold(threshold)
-        raw_loss=hansen_thresh_16.select(['loss_{}'.format(threshold)]);
-        self.loss=self._mean_loss(raw_loss)
-        self.loss_mask=raw_loss.neq(0)
+        self.loss=hansen_binary_loss_16.select(['loss_{}'.format(threshold)]);
 
-        
-    def _treecover_mask_for_threshold(self,threshold):
-        return hansen.select(['treecover2000']).gte(threshold)
-
-    
-    def _mean_loss(self,raw_loss):
-        return raw_loss.gt(0).reproject(
-                    scale=SCALE,
-                    crs=CRS
-                ).reduceResolution(
-                    reducer=ee.Reducer.mean(),
-                    maxPixels=MAX_PIXS
-                )
 
     """BAND 1 (loss_yy): two-digit loss year (corresponding to the most carbon loss)
     """
     def _get_loss_yy(self):
-        return lossyear
-
+        return lossyear.mask(lossyear.gt(0)).reduceResolution(
+                    reducer=ee.Reducer.mode(),
+                    maxPixels=MAX_PIXS
+                ).unmask()
 
     """BAND 2: biomass_loss 
     """
     def _get_biomass_loss(self,density):
-        return self.loss.multiply(density).updateMask(self.loss_mask)
+        return self.loss.divide(255.0).multiply(density)
         
 
     """ BAND 3: density
