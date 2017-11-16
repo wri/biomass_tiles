@@ -127,9 +127,9 @@ class BIOMASS(object):
 def split_asset_name():
     asset_z=SPLIT_Z-1
     if geom_name==DEFAULT_GEOM_NAME:
-        name='t{}_z{}'.format(threshold,asset_z)
+        name='tc{}_z{}'.format(threshold,asset_z)
     else:
-        name='{}_t{}_z{}'.format(geom_name,threshold,asset_z)
+        name='{}_tc{}_z{}'.format(geom_name,threshold,asset_z)
     return '{}{}'.format(name_prefix,name)
 
 
