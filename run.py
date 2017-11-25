@@ -48,6 +48,7 @@ carbon=ee.ImageCollection(CARBON_ASSET_IDS).max().rename(['carbon'])
 # carbon = ee.Image('users/davethau/whrc_carbon_test/carbon').rename(['carbon'])
 
 lossyear=hansen.select(['lossyear'])
+lossyear=lossyear.updateMask(lossyear.neq(0))
 
 
 
@@ -100,14 +101,14 @@ class BIOMASS(object):
             yy_img=ee.Image(yy_img)
             yy=ee.Number(yy_img.get('year')).toInt()
             lby=lossyear.eq(yy).multiply(255).toInt().rename(['loss'])
-            loss_image = lby.multiply(carbon);
+            loss_image = lby.unmask(0).multiply(carbon);
             return yy_img.addBands(
-                loss_image).toFloat()
+                loss_image).mask(self.loss.gt(0)).toFloat()
 
         year_images=YEARS.map(_yy_image)
         year_and_loss_images=ee.ImageCollection.fromImages(year_images.map(_yy_loss_image))
         return year_and_loss_images.qualityMosaic(
-            'loss').select('year').mask(self.loss.gt(0)).unmask()
+            'loss').select('year').unmask()
 
 
     """BAND 2: biomass_loss 
