@@ -81,6 +81,7 @@ class BIOMASS(object):
     
     def _init_assets(self,threshold):
         self.loss=hansen_binary_loss_16.select(['loss_{}'.format(threshold)]);
+        self.loss_mask=self.loss.gt(0)
 
 
     """BAND 1 (loss_yy): two-digit loss year (corresponding to the most carbon loss)
@@ -90,7 +91,7 @@ class BIOMASS(object):
     #                 reducer=ee.Reducer.mode(),
     #                 maxPixels=MAX_PIXS
     #             ).unmask()
-
+    
     def _get_loss_yy(self):
 
         def _yy_image(yy):
@@ -101,9 +102,9 @@ class BIOMASS(object):
             yy_img=ee.Image(yy_img)
             yy=ee.Number(yy_img.get('year')).toInt()
             lby=lossyear.eq(yy).multiply(255).toInt().rename(['loss'])
-            loss_image = lby.unmask(0).multiply(carbon);
+            loss_image = lby.multiply(carbon);
             return yy_img.addBands(
-                loss_image).mask(self.loss.gt(0)).toFloat()
+                loss_image).updateMask(self.loss_mask).toFloat()
 
         year_images=YEARS.map(_yy_image)
         year_and_loss_images=ee.ImageCollection.fromImages(year_images.map(_yy_loss_image))
