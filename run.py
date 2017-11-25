@@ -5,11 +5,12 @@ gee.init()
 
 """ CONFIG
 """
+VERSION='v1'
 MAX_PIXS=65500
 CRS="EPSG:4326"
 SCALE=27.829872698318393
 START_Z=12
-SPLIT_Z=7
+SPLIT_Z=2
 END_Z=2
 END_YY=16
 Z_LEVELS=[156000,78000,39000,20000,10000,4900,2400,1200,611,305,152,76,38]
@@ -17,7 +18,7 @@ THRESHOLDS=[10,15,20,25,30,50,75]
 DEFAULT_GEOM_NAME='hansen_world'
 GEE_ROOT='projects/wri-datalab'
 GEE_SPLIT_FOLDER='biomass_zsplit'
-GCS_TILES_ROOT='biomass/tc'
+GCS_TILES_ROOT='biomass/{}'.format(VERSION)
 GCS_BUCKET='wri-public'
 YEARS=ee.List.sequence(1,END_YY)
 BANDS=['year', 'total_biomass_loss', 'density']
@@ -48,7 +49,6 @@ carbon=ee.ImageCollection(CARBON_ASSET_IDS).max().rename(['carbon'])
 # carbon = ee.Image('users/davethau/whrc_carbon_test/carbon').rename(['carbon'])
 
 lossyear=hansen.select(['lossyear'])
-lossyear=lossyear.updateMask(lossyear.neq(0))
 
 
 
@@ -81,7 +81,7 @@ class BIOMASS(object):
     
     def _init_assets(self,threshold):
         self.loss=hansen_binary_loss_16.select(['loss_{}'.format(threshold)]);
-        self.loss_mask=self.loss.gt(0)
+        self.loss_mask=lossyear.gt(0)
 
 
     """BAND 1 (loss_yy): two-digit loss year (corresponding to the most carbon loss)
@@ -91,7 +91,7 @@ class BIOMASS(object):
     #                 reducer=ee.Reducer.mode(),
     #                 maxPixels=MAX_PIXS
     #             ).unmask()
-    
+
     def _get_loss_yy(self):
 
         def _yy_image(yy):
@@ -129,9 +129,9 @@ class BIOMASS(object):
 def split_asset_name():
     asset_z=SPLIT_Z-1
     if geom_name==DEFAULT_GEOM_NAME:
-        name='tc{}_z{}'.format(threshold,asset_z)
+        name='{}{}_z{}'.format(VERSION,threshold,asset_z)
     else:
-        name='{}_tc{}_z{}'.format(geom_name,threshold,asset_z)
+        name='{}_{}{}_z{}'.format(geom_name,VERSION,threshold,asset_z)
     return '{}{}'.format(name_prefix,name)
 
 
