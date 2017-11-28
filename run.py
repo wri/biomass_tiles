@@ -155,7 +155,7 @@ class BIOMASS(object):
 """EXPORT HELPERS: biomass_loss 
 """
 def split_asset_name():
-    asset_z=SPLIT_Z-1
+    asset_z=SPLIT_Z+1
     if geom_name==DEFAULT_GEOM_NAME:
         name='{}_tc{}_z{}'.format(VERSION,threshold,asset_z)
     else:
