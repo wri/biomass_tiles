@@ -79,7 +79,7 @@ def zmode(img,z,scale=SCALE):
 
 
 def reduce(img,z,scale,reducer):
-    if (z==START_Z): 
+    if (z==START_Z):
         return img
     else:
         return img.reproject(
