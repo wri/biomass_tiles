@@ -5,7 +5,7 @@ gee.init()
 
 """ CONFIG
 """
-VERSION='v1'
+VERSION='v2'
 MAX_PIXS=65500
 CRS="EPSG:4326"
 SCALE=27.829872698318393
@@ -79,7 +79,7 @@ def zmode(img,z,scale=SCALE):
 
 
 def reduce(img,z,scale,reducer):
-    if (z==Z_MAX): 
+    if (z==START_Z): 
         return img
     else:
         return img.reproject(
@@ -118,7 +118,7 @@ class BIOMASS(object):
 
 
     def _init_assets(self,loss,lossyear,carbon,z,init_scale):
-        self.loss=loss.reproject(crs=CRS,scale:Z_LEVELS[z]).rename(['loss'])
+        self.loss=loss.reproject(crs=CRS,scale=Z_LEVELS[z]).rename(['loss'])
         self.lossyear=zmode(lossyear,z,init_scale).rename(['lossyear'])
         self.carbon=zsum(carbon,z,init_scale).rename(['carbon'])
         self.lossyear_mask=self.lossyear.gt(0)
@@ -131,7 +131,7 @@ class BIOMASS(object):
         def _yy_loss_image(yy):
             yy=ee.Number(yy).toInt()
             lby=self.lossyear.eq(yy).multiply(255).toInt()
-            loss_image = lby.multiply(carbon);
+            loss_image = lby.multiply(self.carbon);
             yy_loss_img=ee.Image(yy).addBands(loss_image).rename(['year','loss'])
             return yy_loss_img.updateMask(self.lossyear_mask).toFloat()
 
@@ -245,7 +245,6 @@ def _split_asset(args):
     export_split_asset(bm.image())
 
 
-
 def main():
     global threshold, geom_name, geom, name_prefix
     parser=argparse.ArgumentParser(description='HANSEN COMPOSITE')
@@ -259,11 +258,11 @@ def main():
         help='geometry name (https://fusiontables.google.com/DataSource?docid=13BvM9v1Rzr90Ykf1bzPgbYvbb8kGSvwyqyDwO8NI)')
     parser.add_argument('threshold',help='treecover 2000:\none of {}'.format(THRESHOLDS))
     subparsers=parser.add_subparsers()
-    parser_inside=subparsers.add_parser('outside', help='export the zoomed out z-levels')
-    parser_inside.set_defaults(func=_inside)
-    parser_outside=subparsers.add_parser('inside', help='export the zoomed in z-levels')
-    parser_outside.add_argument('-a','--split_asset',default=True,help='export spit asset')
+    parser_outside=subparsers.add_parser('outside', help='export the zoomed out z-levels')
     parser_outside.set_defaults(func=_outside)
+    parser_inside=subparsers.add_parser('inside', help='export the zoomed in z-levels')
+    parser_inside.add_argument('-a','--split_asset',default=True,help='export spit asset')
+    parser_inside.set_defaults(func=_inside)
     parser_split_asset=subparsers.add_parser('split_asset', help='export z-level split asset')
     parser_split_asset.set_defaults(func=_split_asset)
     args=parser.parse_args()
