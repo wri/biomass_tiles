@@ -105,11 +105,12 @@ class BIOMASS(object):
 
     def image(self):
         if not self._image:
-            loss_yy=self._get_loss_yy()
+            loss_mask=self.loss.gt(0)
+            loss_yy=self._get_loss_yy().updateMask(loss_mask)
             density=self._get_density()
-            biomass_loss=self._get_biomass_loss(density)
+            biomass_loss=self._get_biomass_loss(density).updateMask(loss_mask)
             self._image=ee.Image([loss_yy,biomass_loss,density]).unmask()
-            self._image=self._image.updateMask(self.loss.gt(0)).rename(BANDS).toInt()
+            self._image=self._image.rename(BANDS).toInt()
         return self._image
     
 
