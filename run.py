@@ -10,7 +10,7 @@ MAX_PIXS=65500
 CRS="EPSG:4326"
 SCALE=27.829872698318393
 START_Z=12
-SPLIT_Z=2
+SPLIT_Z=6
 END_Z=2
 END_YY=16
 YEARS=ee.List.sequence(1,END_YY)
@@ -156,9 +156,9 @@ class BIOMASS(object):
 def split_asset_name():
     asset_z=SPLIT_Z-1
     if geom_name==DEFAULT_GEOM_NAME:
-        name='{}{}_z{}'.format(VERSION,threshold,asset_z)
+        name='{}_tc{}_z{}'.format(VERSION,threshold,asset_z)
     else:
-        name='{}_{}{}_z{}'.format(geom_name,VERSION,threshold,asset_z)
+        name='{}_{}_tc{}_z{}'.format(geom_name,VERSION,threshold,asset_z)
     return '{}{}'.format(name_prefix,name)
 
 
@@ -225,19 +225,19 @@ def _outside(args):
     loss=split_data.select(['loss'])
     lossyear=split_data.select(['lossyear'])
     carbon=split_data.select(['carbon'])
-    for z in range(SPLIT_Z,END_Z-1,-1):
+    for z in range(END_Z,SPLIT_Z+1):
         bmz=BIOMASS(loss,hansen_lossyear,whrc_carbon,z,Z_LEVELS[SPLIT_Z+1])
         export_tiles(bmz.image(),z,z)
 
 
 def _inside(args):
     loss=hansen_binary_loss_16.select(['loss_{}'.format(int(args.threshold))])
-    for z in range(START_Z,SPLIT_Z,-1):
+    for z in range(SPLIT_Z+1,START_Z+1):
         bmz=BIOMASS(loss,hansen_lossyear,whrc_carbon,z)
-        export_tiles(bmz.image(),z,z)
-        if (z==(SPLIT_Z+1)):
+        if (z==(SPLIT_Z+1)) and (SPLIT_Z>END_Z):
             if (args.split_asset is True) or (args.split_asset.lower()=='true'):
                 export_split_asset(bmz.split_data())
+        export_tiles(bmz.image(),z,z)
 
 
 def _split_asset(args):
