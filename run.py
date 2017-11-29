@@ -78,25 +78,25 @@ class BIOMASS(object):
     # STATIC METHODS
     #
     @staticmethod
-    def _zsum(img,z,scale=SCALE):
+    def _zsum(img,z,init_scale=SCALE):
         reducer=ee.Reducer.mean()
-        return self._reduce(img,z,scale,reducer)
+        return self._reduce(img,z,init_scale,reducer)
 
 
     @staticmethod
-    def _zmode(img,z,scale=SCALE):
+    def _zmode(img,z,init_scale=SCALE):
         img=img.updateMask(img.gt(0))
         reducer=ee.Reducer.mode()
-        return self._reduce(img,z,scale,reducer)
+        return self._reduce(img,z,init_scale,reducer)
 
 
     @staticmethod
-    def _reduce(img,z,scale,reducer):
+    def _reduce(img,z,init_scale,reducer):
         if (z==START_Z):
             return img
         else:
             return img.reproject(
-                        scale=scale,
+                        scale=init_scale,
                         crs=CRS
                 ).reduceResolution(
                         reducer=reducer,
