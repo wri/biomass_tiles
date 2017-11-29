@@ -48,9 +48,9 @@ hansen_thresh_16=ee.Image('projects/wri-datalab/HansenComposite_16')
 hansen_binary_loss_16=ee.Image('projects/wri-datalab/HANSEN_BINARY_LOSS_16')
 hansen=ee.Image('UMD/hansen/global_forest_change_2016_v1_4')
 whrc_carbon=ee.ImageCollection(CARBON_ASSET_IDS).max().rename(['carbon'])
-# carbon = ee.Image('users/davethau/whrc_carbon_test/carbon').rename(['carbon'])
-
 hansen_lossyear=hansen.select(['lossyear'])
+
+
 
 
 
@@ -65,8 +65,7 @@ def get_geom(name):
 
 
 
-"""HELPERS
-"""
+
 
 
 """BIOMASS CLASS
@@ -169,7 +168,11 @@ class BIOMASS(object):
         return self.carbon.unitScale(0, 450).multiply(255).toInt()
 
 
-"""EXPORT HELPERS: biomass_loss 
+
+
+
+
+"""EXPORT HELPERS: 
 """
 def split_asset_name():
     asset_z=SPLIT_Z+1
@@ -232,6 +235,9 @@ def export_split_asset(img):
 def run_task(task):
     task.start()
     print task.status()
+
+
+
 
 
 
