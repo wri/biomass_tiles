@@ -5,7 +5,7 @@ gee.init()
 
 """ CONFIG
 """
-VERSION='v2'
+VERSION='v3'
 MAX_PIXS=65500
 CRS="EPSG:4326"
 SCALE=27.829872698318393
@@ -194,7 +194,7 @@ def tiles_path():
 
 def tiles_description(path,z,min_z=None):
     dpath=path.replace('/','__')
-    if min_z:
+    if (z!=min_z):
         return '{}__{}_{}'.format(dpath,z,min_z)
     else:
         return '{}__{}'.format(dpath,z)
