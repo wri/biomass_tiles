@@ -67,40 +67,62 @@ def get_geom(name):
 
 """HELPERS
 """
-def zsum(img,z,scale=SCALE):
-    reducer=ee.Reducer.mean()
-    return reduce(img,z,scale,reducer)
 
-
-def zmode(img,z,scale=SCALE):
-    img=img.updateMask(img.gt(0))
-    reducer=ee.Reducer.mode()
-    return reduce(img,z,scale,reducer)
-
-
-def reduce(img,z,scale,reducer):
-    if (z==START_Z):
-        return img
-    else:
-        return img.reproject(
-                    scale=scale,
-                    crs=CRS
-            ).reduceResolution(
-                    reducer=reducer,
-                    maxPixels=MAX_PIXS
-            ).reproject(
-                    scale=Z_LEVELS[z],
-                    crs=CRS
-            )
 
 """BIOMASS CLASS
 """
 class BIOMASS(object):
 
 
-    def __init__(self,loss,lossyear,carbon,z,init_scale=SCALE):
+    # 
+    # STATIC METHODS
+    #
+    @staticmethod
+    def _zsum(img,z,scale=SCALE):
+        reducer=ee.Reducer.mean()
+        return self._reduce(img,z,scale,reducer)
+
+
+    @staticmethod
+    def _zmode(img,z,scale=SCALE):
+        img=img.updateMask(img.gt(0))
+        reducer=ee.Reducer.mode()
+        return self._reduce(img,z,scale,reducer)
+
+
+    @staticmethod
+    def _reduce(img,z,scale,reducer):
+        if (z==START_Z):
+            return img
+        else:
+            return img.reproject(
+                        scale=scale,
+                        crs=CRS
+                ).reduceResolution(
+                        reducer=reducer,
+                        maxPixels=MAX_PIXS
+                ).reproject(
+                        scale=Z_LEVELS[z],
+                        crs=CRS
+                )
+
+
+    @staticmethod
+    def _yy_loss_image(yy):
+        yy=ee.Number(yy).toInt()
+        lby=self.lossyear.eq(yy).multiply(255).toInt()
+        loss_image = lby.multiply(self.carbon);
+        yy_loss_img=ee.Image(yy).addBands(loss_image).rename(['year','loss'])
+        return yy_loss_img.updateMask(self.lossyear_mask).toFloat()
+
+
+
+    # 
+    # PUBLIC METHODS
+    #
+    def __init__(self,loss,lossyear,carbon,target_z,data_z=START_Z):
         self._image=None
-        self._init_assets(loss,lossyear,carbon,z,init_scale)
+        self._init_assets(loss,lossyear,carbon,target_z,Z_LEVELS[data_z])
         
 
     def image(self):
@@ -118,25 +140,20 @@ class BIOMASS(object):
         return self.loss.addBands([self.lossyear,self.carbon])
 
 
+    # 
+    # INTERNAL METHODS
+    #
     def _init_assets(self,loss,lossyear,carbon,z,init_scale):
         self.loss=loss.reproject(crs=CRS,scale=Z_LEVELS[z]).rename(['loss'])
-        self.lossyear=zmode(lossyear,z,init_scale).rename(['lossyear'])
-        self.carbon=zsum(carbon,z,init_scale).rename(['carbon'])
+        self.lossyear=self._zmode(lossyear,z,init_scale).rename(['lossyear'])
+        self.carbon=self._zsum(carbon,z,init_scale).rename(['carbon'])
         self.lossyear_mask=self.lossyear.gt(0)
 
 
     """BAND 1 (loss_yy): two-digit loss year (corresponding to the most carbon loss)
     """
     def _get_loss_yy(self):
-
-        def _yy_loss_image(yy):
-            yy=ee.Number(yy).toInt()
-            lby=self.lossyear.eq(yy).multiply(255).toInt()
-            loss_image = lby.multiply(self.carbon);
-            yy_loss_img=ee.Image(yy).addBands(loss_image).rename(['year','loss'])
-            return yy_loss_img.updateMask(self.lossyear_mask).toFloat()
-
-        year_and_loss_images=ee.ImageCollection.fromImages(YEARS.map(_yy_loss_image))
+        year_and_loss_images=ee.ImageCollection.fromImages(YEARS.map(self._yy_loss_image))
         return year_and_loss_images.qualityMosaic('loss').select(['year']).unmask()
 
 
@@ -183,7 +200,6 @@ def tiles_description(path,z,min_z=None):
         return '{}__{}'.format(dpath,z)
 
 
-
 def export_tiles(img,max_z,min_z):
     path=tiles_path()
     task=ee.batch.Export.map.toCloudStorage(
@@ -227,7 +243,7 @@ def _outside(args):
     lossyear=split_data.select(['lossyear'])
     carbon=split_data.select(['carbon'])
     for z in range(END_Z,SPLIT_Z+1):
-        bmz=BIOMASS(loss,hansen_lossyear,whrc_carbon,z,Z_LEVELS[SPLIT_Z+1])
+        bmz=BIOMASS(loss,hansen_lossyear,whrc_carbon,z,SPLIT_Z+1)
         export_tiles(bmz.image(),z,z)
 
 
