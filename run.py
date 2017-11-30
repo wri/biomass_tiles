@@ -8,22 +8,9 @@ gee.init()
 """ CONFIG
 """
 VERSION='v3'
-MAX_PIXS=65500
-CRS="EPSG:4326"
-SCALE=27.829872698318393
-START_Z=12
-SPLIT_Z=6
-END_Z=2
 END_YY=16
-YEARS=ee.List.sequence(1,END_YY)
-Z_LEVELS=[156000,78000,39000,20000,10000,4900,2400,1200,611,305,152,76,38]
-THRESHOLDS=[10,15,20,25,30,50,75]
-DEFAULT_GEOM_NAME='tropics'
-GEE_ROOT='projects/wri-datalab'
-GEE_SPLIT_FOLDER='biomass_zsplit'
-GCS_TILES_ROOT='biomass/{}'.format(VERSION)
-GCS_BUCKET='wri-public'
-BANDS=['year', 'total_biomass_loss', 'density']
+BINARY_LOSS_ASSET_ID='projects/wri-datalab/HANSEN_BINARY_LOSS_16'
+HANSEN_ASSET_ID='UMD/hansen/global_forest_change_2016_v1_4' 
 CARBON_ASSET_IDS=[
       'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Neotropic',
       'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Africa',
@@ -33,7 +20,23 @@ CARBON_ASSET_IDS=[
       'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Nearctic'
     ]
 
-    
+
+MAX_PIXS=65500
+CRS="EPSG:4326"
+SCALE=27.829872698318393
+START_Z=12
+SPLIT_Z=6
+END_Z=2
+YEARS=ee.List.sequence(1,END_YY)
+Z_LEVELS=[156000,78000,39000,20000,10000,4900,2400,1200,611,305,152,76,38]
+THRESHOLDS=[10,15,20,25,30,50,75]
+DEFAULT_GEOM_NAME='tropics'
+GEE_ROOT='projects/wri-datalab'
+GEE_SPLIT_FOLDER='biomass_zsplit'
+GCS_TILES_ROOT='biomass/{}'.format(VERSION)
+GCS_BUCKET='wri-public'
+BANDS=['year', 'total_biomass_loss', 'density']
+   
 
 
 """PARAMS
@@ -48,9 +51,8 @@ geom_name=None
 
 """"ASSETS
 """
-hansen_thresh_16=ee.Image('projects/wri-datalab/HansenComposite_16')
-hansen_binary_loss_16=ee.Image('projects/wri-datalab/HANSEN_BINARY_LOSS_16')
-hansen=ee.Image('UMD/hansen/global_forest_change_2016_v1_4')
+hansen_binary_loss=ee.Image(BINARY_LOSS_ASSET_ID)
+hansen=ee.Image(HANSEN_ASSET_ID)
 whrc_carbon=ee.ImageCollection(CARBON_ASSET_IDS).max().rename(['carbon'])
 hansen_lossyear=hansen.select(['lossyear'])
 
@@ -306,7 +308,7 @@ def _outside(args):
 
 
 def _inside(args):
-    loss=hansen_binary_loss_16.select(['loss_{}'.format(int(args.threshold))])
+    loss=hansen_binary_loss.select(['loss_{}'.format(int(args.threshold))])
     for z in range(SPLIT_Z+1,START_Z+1):
         bmz=BIOMASS(loss,hansen_lossyear,whrc_carbon,z)
         if (z==(SPLIT_Z+1)) and (SPLIT_Z>END_Z):
@@ -338,7 +340,7 @@ def main():
     parser_inside=subparsers.add_parser('inside', help='export the zoomed in z-levels')
     parser_inside.add_argument('-a','--split_asset',default=True,help='export spit asset')
     parser_inside.set_defaults(func=_inside)
-    parser_split_asset=subparsers.add_parser('split_asset', help='export z-level split asset')
+    parser_split_asset=subparsers.add_parser('split_asset', help='true/false - export z-level split asset. defaults to true.')
     parser_split_asset.set_defaults(func=_split_asset)
     args=parser.parse_args()
     if int(args.threshold) in THRESHOLDS: 
