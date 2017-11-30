@@ -3,6 +3,8 @@ import argparse
 gee.init()
 
 
+
+
 """ CONFIG
 """
 VERSION='v3'
@@ -16,7 +18,7 @@ END_YY=16
 YEARS=ee.List.sequence(1,END_YY)
 Z_LEVELS=[156000,78000,39000,20000,10000,4900,2400,1200,611,305,152,76,38]
 THRESHOLDS=[10,15,20,25,30,50,75]
-DEFAULT_GEOM_NAME='hansen_world'
+DEFAULT_GEOM_NAME='tropics'
 GEE_ROOT='projects/wri-datalab'
 GEE_SPLIT_FOLDER='biomass_zsplit'
 GCS_TILES_ROOT='biomass/{}'.format(VERSION)
@@ -30,8 +32,8 @@ CARBON_ASSET_IDS=[
       'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Palearctic',
       'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Nearctic'
     ]
-    
 
+    
 
 
 """PARAMS
@@ -42,6 +44,8 @@ geom=None
 geom_name=None
 
 
+
+
 """"ASSETS
 """
 hansen_thresh_16=ee.Image('projects/wri-datalab/HansenComposite_16')
@@ -49,8 +53,6 @@ hansen_binary_loss_16=ee.Image('projects/wri-datalab/HANSEN_BINARY_LOSS_16')
 hansen=ee.Image('UMD/hansen/global_forest_change_2016_v1_4')
 whrc_carbon=ee.ImageCollection(CARBON_ASSET_IDS).max().rename(['carbon'])
 hansen_lossyear=hansen.select(['lossyear'])
-
-
 
 
 
@@ -73,20 +75,26 @@ def get_geom(name):
 class BIOMASS(object):
 
 
+    ############################################    
     # 
-    # STATIC METHODS
     #
+    #   STATIC METHODS
+    #
+    #
+    ############################################
+
+    
     @staticmethod
     def _zsum(img,z,init_scale=SCALE):
         reducer=ee.Reducer.mean()
-        return self._reduce(img,z,init_scale,reducer)
+        return BIOMASS._reduce(img,z,init_scale,reducer)
 
 
     @staticmethod
     def _zmode(img,z,init_scale=SCALE):
         img=img.updateMask(img.gt(0))
         reducer=ee.Reducer.mode()
-        return self._reduce(img,z,init_scale,reducer)
+        return BIOMASS._reduce(img,z,init_scale,reducer)
 
 
     @staticmethod
@@ -106,24 +114,44 @@ class BIOMASS(object):
                 )
 
 
-    @staticmethod
-    def _yy_loss_image(yy):
-        yy=ee.Number(yy).toInt()
-        lby=self.lossyear.eq(yy).multiply(255).toInt()
-        loss_image = lby.multiply(self.carbon);
-        yy_loss_img=ee.Image(yy).addBands(loss_image).rename(['year','loss'])
-        return yy_loss_img.updateMask(self.lossyear_mask).toFloat()
-
-
-
+    ############################################    
     # 
-    # PUBLIC METHODS
     #
+    #   PUBLIC METHODS
+    #
+    #
+    ############################################
+
+
+    """constructor
+
+        ARGS:
+            assets:
+                * for each of the assets below we use the raw data or,
+                  for lower zoom levels, the "split_data" output asset.
+
+                - loss (binary hansen loss image: 'projects/wri-datalab/HANSEN_BINARY_LOSS_16' or latest)
+                - lossyear (hansen lossyear band)
+                - carbon (carbon data)
+
+            config:
+                - target_z: the z_level of the final image.
+                - data_z: the z_level of the input assets described above
+
+    """
     def __init__(self,loss,lossyear,carbon,target_z,data_z=START_Z):
         self._image=None
         self._init_assets(loss,lossyear,carbon,target_z,Z_LEVELS[data_z])
         
 
+    """image
+
+        returns ee.image  
+            - bands: ['year', 'total_biomass_loss', 'density']
+            - nominalScale: Z_LEVELS[z]
+            - export to tiles at zoom level z
+    
+    """
     def image(self):
         if not self._image:
             loss_mask=self.loss.gt(0)
@@ -135,13 +163,29 @@ class BIOMASS(object):
         return self._image
     
 
+    """split_data
+
+        returns ee.image  
+            - bands: [loss,lossyear,carbon] 
+            - nominalScale: Z_LEVELS[z]
+            - save as asset to get around "too many input per out pixels" error
+
+    """
     def split_data(self):
         return self.loss.addBands([self.lossyear,self.carbon])
 
 
+    ############################################    
     # 
-    # INTERNAL METHODS
     #
+    #   INTERNAL METHODS
+    #
+    #
+    ############################################
+
+
+    """initialize assets: reduce loss/lossyear/carbon data to target z_level
+    """
     def _init_assets(self,loss,lossyear,carbon,z,init_scale):
         self.loss=loss.reproject(crs=CRS,scale=Z_LEVELS[z]).rename(['loss'])
         self.lossyear=self._zmode(lossyear,z,init_scale).rename(['lossyear'])
@@ -152,7 +196,15 @@ class BIOMASS(object):
     """BAND 1 (loss_yy): two-digit loss year (corresponding to the most carbon loss)
     """
     def _get_loss_yy(self):
-        year_and_loss_images=ee.ImageCollection.fromImages(YEARS.map(self._yy_loss_image))
+
+        def _yy_loss_image(yy):
+            yy=ee.Number(yy).toInt()
+            lby=self.lossyear.eq(yy).multiply(255).toInt()
+            loss_image = lby.multiply(self.carbon);
+            yy_loss_img=ee.Image(yy).addBands(loss_image).rename(['year','loss'])
+            return yy_loss_img.updateMask(self.lossyear_mask).toFloat()
+        
+        year_and_loss_images=ee.ImageCollection.fromImages(YEARS.map(_yy_loss_image))
         return year_and_loss_images.qualityMosaic('loss').select(['year']).unmask()
 
 
@@ -249,7 +301,7 @@ def _outside(args):
     lossyear=split_data.select(['lossyear'])
     carbon=split_data.select(['carbon'])
     for z in range(END_Z,SPLIT_Z+1):
-        bmz=BIOMASS(loss,hansen_lossyear,whrc_carbon,z,SPLIT_Z+1)
+        bmz=BIOMASS(loss,lossyear,carbon,z,SPLIT_Z+1)
         export_tiles(bmz.image(),z,z)
 
 
