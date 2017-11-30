@@ -85,7 +85,7 @@ class BIOMASS(object):
 
     
     @staticmethod
-    def _zsum(img,z,init_scale=SCALE):
+    def _zmean(img,z,init_scale=SCALE):
         reducer=ee.Reducer.mean()
         return BIOMASS._reduce(img,z,init_scale,reducer)
 
@@ -189,7 +189,7 @@ class BIOMASS(object):
     def _init_assets(self,loss,lossyear,carbon,z,init_scale):
         self.loss=loss.reproject(crs=CRS,scale=Z_LEVELS[z]).rename(['loss'])
         self.lossyear=self._zmode(lossyear,z,init_scale).rename(['lossyear'])
-        self.carbon=self._zsum(carbon,z,init_scale).rename(['carbon'])
+        self.carbon=self._zmean(carbon,z,init_scale).rename(['carbon'])
         self.lossyear_mask=self.lossyear.gt(0)
 
 
