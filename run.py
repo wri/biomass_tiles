@@ -7,7 +7,7 @@ gee.init()
 
 """ CONFIG
 """
-VERSION='v3'
+VERSION='v1'
 END_YY=16
 BINARY_LOSS_ASSET_ID='projects/wri-datalab/umd/HANSEN_BINARY_LOSS_17'
 HANSEN_ASSET_ID='UMD/hansen/global_forest_change_2017_v1_5' 
@@ -26,7 +26,7 @@ THRESHOLDS=[10,15,20,25,30,50,75]
 DEFAULT_GEOM_NAME='tropics'
 GEE_ROOT='projects/wri-datalab'
 GEE_SPLIT_FOLDER='co2_zsplit'
-GCS_TILES_ROOT='co2/{}'.format(VERSION)
+GCS_TILES_ROOT='co2/2017/{}'.format(VERSION)
 GCS_BUCKET='wri-public'
 BANDS=['year', 'total_co2_loss', 'density']
    
