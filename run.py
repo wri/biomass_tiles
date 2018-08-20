@@ -12,7 +12,7 @@ END_YY=17
 BINARY_LOSS_ASSET_ID='projects/wri-datalab/umd/HANSEN_BINARY_LOSS_17'
 HANSEN_ASSET_ID='UMD/hansen/global_forest_change_2017_v1_5' 
 CARBON_ASSET_IC_ID='projects/wri-datalab/WHRC_CARBON'
-CO2_CONVERSION=1.835
+
 
 MAX_PIXS=65500
 CRS="EPSG:4326"
@@ -25,10 +25,10 @@ Z_LEVELS=[156000,78000,39000,20000,10000,4900,2400,1200,611,305,152,76,38]
 THRESHOLDS=[10,15,20,25,30,50,75]
 DEFAULT_GEOM_NAME='tropics'
 GEE_ROOT='projects/wri-datalab'
-GEE_SPLIT_FOLDER='co2_zsplit'
-GCS_TILES_ROOT='co2/2017/{}'.format(VERSION)
+GEE_SPLIT_FOLDER='biomass_2017_zsplit'
+GCS_TILES_ROOT='biomass/2017/{}'.format(VERSION)
 GCS_BUCKET='wri-public'
-BANDS=['year', 'total_co2_loss', 'density']
+BANDS=['year', 'total_biomass_loss', 'density']
    
 
 
@@ -41,15 +41,12 @@ geom_name=None
 
 
 
-
 """"ASSETS
 """
 hansen_binary_loss=ee.Image(BINARY_LOSS_ASSET_ID)
 hansen=ee.Image(HANSEN_ASSET_ID)
 whrc_carbon=ee.ImageCollection(CARBON_ASSET_IC_ID).max().rename(['carbon'])
-whrc_carbon=whrc_carbon.multiply(CO2_CONVERSION)
 hansen_lossyear=hansen.select(['lossyear'])
-
 
 
 
@@ -143,7 +140,7 @@ class BIOMASS(object):
     """image
 
         returns ee.image  
-            - bands: ['year', 'total_co2_loss', 'density']
+            - bands: ['year', 'total_biomass_loss', 'density']
             - nominalScale: Z_LEVELS[z]
             - export to tiles at zoom level z
     
@@ -153,8 +150,8 @@ class BIOMASS(object):
             loss_mask=self.loss.gt(0)
             loss_yy=self._get_loss_yy().updateMask(loss_mask)
             density=self._get_density()
-            co2_loss=self._get_co2_loss(density).updateMask(loss_mask)
-            self._image=ee.Image([loss_yy,co2_loss,density]).unmask()
+            biomass_loss=self._get_biomass_loss(density).updateMask(loss_mask)
+            self._image=ee.Image([loss_yy,biomass_loss,density]).unmask()
             self._image=self._image.rename(BANDS).toInt()
         return self._image
     
@@ -204,9 +201,9 @@ class BIOMASS(object):
         return year_and_loss_images.qualityMosaic('loss').select(['year']).unmask()
 
 
-    """BAND 2: co2_loss 
+    """BAND 2: biomass_loss 
     """
-    def _get_co2_loss(self,density):
+    def _get_biomass_loss(self,density):
         return self.loss.divide(255.0).multiply(density)
         
 
