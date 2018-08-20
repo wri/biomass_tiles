@@ -7,18 +7,11 @@ gee.init()
 
 """ CONFIG
 """
-VERSION='v3'
-END_YY=16
-BINARY_LOSS_ASSET_ID='projects/wri-datalab/HANSEN_BINARY_LOSS_16'
-HANSEN_ASSET_ID='UMD/hansen/global_forest_change_2016_v1_4' 
-CARBON_ASSET_IDS=[
-      'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Neotropic',
-      'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Africa',
-      'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Australia',
-      'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Tropical_Asia',
-      'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Palearctic',
-      'users/mfarina/Biomass_Data_MapV3/WHRC_Biomass_30m_Nearctic'
-    ]
+VERSION='v1'
+END_YY=17
+BINARY_LOSS_ASSET_ID='projects/wri-datalab/umd/HANSEN_BINARY_LOSS_17'
+HANSEN_ASSET_ID='UMD/hansen/global_forest_change_2017_v1_5' 
+CARBON_ASSET_IC_ID='projects/wri-datalab/WHRC_CARBON'
 
 
 MAX_PIXS=65500
@@ -32,8 +25,8 @@ Z_LEVELS=[156000,78000,39000,20000,10000,4900,2400,1200,611,305,152,76,38]
 THRESHOLDS=[10,15,20,25,30,50,75]
 DEFAULT_GEOM_NAME='tropics'
 GEE_ROOT='projects/wri-datalab'
-GEE_SPLIT_FOLDER='biomass_zsplit'
-GCS_TILES_ROOT='biomass/{}'.format(VERSION)
+GEE_SPLIT_FOLDER='biomass_2017_zsplit'
+GCS_TILES_ROOT='biomass/2017/{}'.format(VERSION)
 GCS_BUCKET='wri-public'
 BANDS=['year', 'total_biomass_loss', 'density']
    
@@ -48,14 +41,12 @@ geom_name=None
 
 
 
-
 """"ASSETS
 """
 hansen_binary_loss=ee.Image(BINARY_LOSS_ASSET_ID)
 hansen=ee.Image(HANSEN_ASSET_ID)
-whrc_carbon=ee.ImageCollection(CARBON_ASSET_IDS).max().rename(['carbon'])
+whrc_carbon=ee.ImageCollection(CARBON_ASSET_IC_ID).max().rename(['carbon'])
 hansen_lossyear=hansen.select(['lossyear'])
-
 
 
 

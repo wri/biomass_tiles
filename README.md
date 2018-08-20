@@ -6,7 +6,7 @@ Future updates will most likely require changing the following CONFIG params:
 
 - VERSION: this is used in the path for GCS tiles
 - END_YY: two digit year for the last year with data
-- BINARY_LOSS_ASSET_ID: binary `hansen lossyear.gt(0)` thresholded by treecover
+- [BINARY_LOSS_ASSET_ID](#hbt): binary `hansen lossyear.gt(0)` thresholded by treecover
 - HANSEN_ASSET_ID: hansen asset with umd-lossyear
 - CARBON_ASSET_IDS: list of carbon assets
 
@@ -63,7 +63,32 @@ optional arguments:
                         export spit asset
 ```
 
+<a name='hbt'></a>
+---
+### Hansen Thresholded Binary Asset
 
+The `BINARY_LOSS_ASSET` is created using the code snippet below. [Here](https://code.earthengine.google.com/53c13b75e91f3e68d882c878c70a7360) is the GEE script for the 2017 data.
+
+```python
+""" band name for threshold """
+var thresholded_bandnames=function(n){
+  return ee.String("loss_").cat(ee.String(n))
+}
+
+""" iterate method for creating binary-thresholded-image """
+var thresholded_hbinary=function(n,im){
+  im=ee.Image(im)
+  var band=hbinary.updateMask(htc.gte(ee.Number(n))).unmask(0)
+  return im.addBands([band])
+}
+
+var thresholds=ee.List([10,15,20,25,30,50,75])
+var band_names=thresholds.map(thresholded_bandnames)
+var binary_thresholed_image=thresholds.iterate(thresholded_hbinary,ee.Image(-1))
+binary_thresholed_image=ee.Image(binary_thresholed_image)
+binary_thresholed_image=binary_thresholed_image.select(binary_thresholed_image.bandNames().slice(1))
+binary_thresholed_image=binary_thresholed_image.rename(band_names)
+```
 
 
 ---
