@@ -8,7 +8,7 @@ gee.init()
 """ CONFIG
 """
 VERSION='v1'
-END_YY=16
+END_YY=17
 BINARY_LOSS_ASSET_ID='projects/wri-datalab/umd/HANSEN_BINARY_LOSS_17'
 HANSEN_ASSET_ID='UMD/hansen/global_forest_change_2017_v1_5' 
 CARBON_ASSET_IC_ID='projects/wri-datalab/WHRC_CARBON'
