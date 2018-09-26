@@ -104,3 +104,50 @@ https://github.com/Vizzuality/data_sci_tutorials/blob/master/work/GFW_climate_bi
 
 ###### GFW-CLIMATE CODE BASE
 https://github.com/Vizzuality/gfw-climate
+
+
+---
+
+#### NOTES
+
+```
+# copy from s3 to gcloud storage
+gsutil -m cp -R s3://whrc-v4-processed gs://wri-public/tsc_drivers/2018/global
+```
+
+--- 
+
+If there are failures:
+1. Get missing files
+```
+# bash
+aws s3 ls whrc-v4-processed
+gsutil ls gs://wri-public/tsc_drivers/2018/global
+# python
+...
+aws_df[~aws_df.filename.isin(gs_df.filename)].to_csv('/Users/brook/WRI/code/TSC_Drivers/todo_files.csv',index=False)
+```
+
+2. Copy missing files
+```
+FILES=( 00N_010E_biomass.tif 00N_020E_biomass.tif 00N_030E_biomass.tif ... )
+
+for f in "${FILES[@]}"
+do
+    echo "S3->GS: "$f
+    gsutil cp s3://whrc-v4-processed/${f} gs://wri-public/tsc_drivers/2018/global/${f}
+done
+```
+
+3. Upload to GEE
+``` 
+# to gee
+IC_ID=projects/wri-datalab/WHRC/global/carbon
+GS_BUCKET=wri-public/tsc_drivers/2018/global
+
+
+cat filenames.txt | while read -r fname ; do
+    echo "GS->GEE: "$fname
+    earthengine upload image --asset_id $IC_ID/whrc-${fname} gs://$GS_BUCKET/${fname}.tif
+done
+```
