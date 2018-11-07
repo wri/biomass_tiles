@@ -131,6 +131,7 @@ aws_df[~aws_df.filename.isin(gs_df.filename)].to_csv('/Users/brook/WRI/code/TSC_
 2. Copy missing files
 ```
 FILES=( 00N_010E_biomass.tif 00N_020E_biomass.tif 00N_030E_biomass.tif ... )
+FILES=( 50N_080E_biomass.tif 60N_050E_biomass.tif 80N_180W_biomass.tif )
 
 for f in "${FILES[@]}"
 do
@@ -150,4 +151,16 @@ cat filenames.txt | while read -r fname ; do
     echo "GS->GEE: "$fname
     earthengine upload image --asset_id $IC_ID/whrc-${fname} gs://$GS_BUCKET/${fname}.tif
 done
+
+earthengine ls $IC_ID >  gee_files.txt
+
+MISSING=( 50N_080E_biomass 60N_050E_biomass 80N_180W_biomass )
+MISSING=( 50N_080E_biomass )
+for fname in "${MISSING[@]}"
+do
+    echo "GS->GEE: "$fname
+    earthengine upload image --asset_id $IC_ID/whrc-${fname} gs://$GS_BUCKET/${fname}.tif
+done
+
+
 ```

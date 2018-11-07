@@ -1,3 +1,4 @@
+from __future__ import print_function
 import ee, gee
 import argparse
 gee.init()
@@ -11,7 +12,8 @@ VERSION='v1'
 END_YY=17
 BINARY_LOSS_ASSET_ID='projects/wri-datalab/umd/HANSEN_BINARY_LOSS_17'
 HANSEN_ASSET_ID='UMD/hansen/global_forest_change_2017_v1_5' 
-CARBON_ASSET_IC_ID='projects/wri-datalab/WHRC_CARBON'
+# CARBON_ASSET_IC_ID='projects/wri-datalab/WHRC_CARBON'
+CARBON_ASSET_IC_ID='projects/wri-datalab/WHRC/global/carbon'
 
 
 MAX_PIXS=65500
@@ -23,10 +25,11 @@ END_Z=2
 YEARS=ee.List.sequence(1,END_YY)
 Z_LEVELS=[156000,78000,39000,20000,10000,4900,2400,1200,611,305,152,76,38]
 THRESHOLDS=[10,15,20,25,30,50,75]
-DEFAULT_GEOM_NAME='tropics'
+# DEFAULT_GEOM_NAME='tropics'
+DEFAULT_GEOM_NAME='hansen_world'
 GEE_ROOT='projects/wri-datalab'
-GEE_SPLIT_FOLDER='biomass_2017_zsplit'
-GCS_TILES_ROOT='biomass/2017/{}'.format(VERSION)
+GEE_SPLIT_FOLDER='biomass_2017-global_zsplit'
+GCS_TILES_ROOT='biomass/global/2017/{}'.format(VERSION)
 GCS_BUCKET='wri-public'
 BANDS=['year', 'total_biomass_loss', 'density']
    
@@ -279,7 +282,7 @@ def export_split_asset(img):
 
 def run_task(task):
     task.start()
-    print task.status()
+    print(task.status())
 
 
 
@@ -340,13 +343,13 @@ def main():
         geom_name=args.geom_name
         geom=get_geom(geom_name)
         if not geom:
-            print 'ERROR: {} is not a valid geometry'.format(geom_name)
+            print('ERROR: {} is not a valid geometry'.format(geom_name))
         else:
-            print "THRESHOLD: {}".format(threshold)
-            print "GEOMETRY: {}".format(geom_name)
+            print("THRESHOLD: {}".format(threshold))
+            print("GEOMETRY: {}".format(geom_name))
             args.func(args)
     else: 
-        print 'INVALID THRESHOLD {}: choose from {}'.format(args.threshold,THRESHOLDS)
+        print('INVALID THRESHOLD {}: choose from {}'.format(args.threshold,THRESHOLDS))
 
 
 if __name__ == "__main__":
