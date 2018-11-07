@@ -8,7 +8,7 @@ gee.init()
 
 """ CONFIG
 """
-VERSION='v1'
+VERSION='v2'
 END_YY=17
 BINARY_LOSS_ASSET_ID='projects/wri-datalab/umd/HANSEN_BINARY_LOSS_17'
 HANSEN_ASSET_ID='UMD/hansen/global_forest_change_2017_v1_5' 
@@ -28,7 +28,7 @@ THRESHOLDS=[10,15,20,25,30,50,75]
 # DEFAULT_GEOM_NAME='tropics'
 DEFAULT_GEOM_NAME='hansen_world'
 GEE_ROOT='projects/wri-datalab'
-GEE_SPLIT_FOLDER='biomass_2017-global_zsplit'
+GEE_SPLIT_FOLDER='biomass_2017-global_zsplit-{}'.format(VERSION)
 GCS_TILES_ROOT='biomass/global/2017/{}'.format(VERSION)
 GCS_BUCKET='wri-public'
 BANDS=['year', 'total_biomass_loss', 'density']
@@ -50,6 +50,7 @@ hansen_binary_loss=ee.Image(BINARY_LOSS_ASSET_ID)
 hansen=ee.Image(HANSEN_ASSET_ID)
 whrc_carbon=ee.ImageCollection(CARBON_ASSET_IC_ID).max().rename(['carbon'])
 hansen_lossyear=hansen.select(['lossyear'])
+treecover=hansen.select(['treecover2000'])
 
 
 
@@ -302,9 +303,11 @@ def _outside(args):
 
 
 def _inside(args):
-    loss=hansen_binary_loss.select(['loss_{}'.format(int(args.threshold))])
+    threshold=int(args.threshold)
+    loss=hansen_binary_loss.select(['loss_{}'.format(threshold)])
+    carbon=whrc_carbon.updateMask(treecover.gte(threshold)).unmask(0)
     for z in range(SPLIT_Z+1,START_Z+1):
-        bmz=BIOMASS(loss,hansen_lossyear,whrc_carbon,z)
+        bmz=BIOMASS(loss,hansen_lossyear,carbon,z)
         if (z==(SPLIT_Z+1)) and (SPLIT_Z>END_Z):
             if (args.split_asset is True) or (args.split_asset.lower()=='true'):
                 export_split_asset(bmz.split_data())
